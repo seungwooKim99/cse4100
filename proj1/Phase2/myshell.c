@@ -6,6 +6,7 @@ void eval(char *cmdline);
 int builtin_command(char **argv);
 int parseline(char *buf, char **argv);
 void unix_error(char *msg);
+int change_directory(char **argv);
 
 int main(){
   char cmdline[MAXLINE];
@@ -37,7 +38,6 @@ void eval(char *cmdline){
         exit(0);
       }
     }
-
     if (!bg){
       int status;
       if (waitpid(pid, &status, 0) <0){
@@ -45,7 +45,7 @@ void eval(char *cmdline){
       }
     }
     else{
-      printf("%d %s", pid, cmdline);
+      printf("%d %s\n", pid, cmdline);
     }
   }
   return;
@@ -53,12 +53,13 @@ void eval(char *cmdline){
 
 int builtin_command(char **argv) 
 {
-  if (!strcmp(argv[0], "quit")) /* quit command */
+  if (!strcmp(argv[0], "exit")) /* quit command */
 	  exit(0);  
   if (!strcmp(argv[0], "&")){    /* Ignore singleton & */
     return 1;
   }
   if (!strcmp(argv[0], "cd")){ // cd는 예외처리
+    change_directory(argv);
     return 1;
   }
   if (!strcmp(argv[0], "ls")){
@@ -113,4 +114,13 @@ int parseline(char *buf, char **argv){
 void unix_error(char *msg){
   fprintf(stderr, "%s: %s\n", msg, strerror(h_errno));
   exit(0);
+}
+
+int change_directory(char **argv){
+  if (argv[1] == NULL)
+    return 0;
+  int res = chdir(argv[1]);
+  if (res)
+    fprintf(stderr, "%s: no such file or directory: %s\n", argv[0], argv[1]);
+  return 0;
 }

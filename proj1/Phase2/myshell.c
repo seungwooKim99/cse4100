@@ -72,7 +72,7 @@ int builtin_command(char **argv)
     argv[0] = "/bin/rmdir";
   }
   else if (!strcmp(argv[0], "touch")){ // linux server에서 /usr 빼기!
-    argv[0] = "/usr/bin/touch";
+    argv[0] = "/bin/touch";
   }
   else if (!strcmp(argv[0], "cat")){
     argv[0] = "/bin/cat";

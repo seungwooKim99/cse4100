@@ -41,59 +41,63 @@ int parseline(char *buf, char **argv)
 }
 
 int main(){
-        int fd[2];
+        int fd[MAXLINE][2];
         pid_t pid[2];
         char *argv[MAXARGS];
         char buf[MAXLINE];
+        int count = 0;
 
-        if(pipe(fd) < 0){
+        if(pipe(fd[count]) < 0){
                 printf("pipe error\n");
                 exit(1);
         }
-        if((pid[0]=fork())<0){
-                printf("fork error\n");
-                exit(1);
-        }
 
-        printf("\n");
-        if (!pid[0]) {
-          if (!(pid[1] = fork())) {
-            // child를 fork한 child (pipe 받을 명령어 수행)
-            close(fd[WRITE]);
-            read(fd[READ],buf,MAX_BUF);
-            printf("child2 got message : %s\n",buf);
-            exit(0);
-          }
-          else {
-            // child (메세지를 보낼 프로세스)
-            close(fd[READ]);
-            strcpy(buf, "/bin/ls -al\n");
-            parseline(buf, argv);
-            dup2(fd[WRITE], STDOUT_FILENO); // stdout이 fd[WRITE]이 되도록
-            
-            //printf("This is execve result from child1\n");
-            printf("%s, %s", argv[0], argv[1]);
-            if (execve(argv[0], argv, environ) < 0) {	//ex) /bin/ls ls -al &
-              printf("Command not found.\n");
-              exit(0);
-            }
-          }
+        printf("go\n");
+        if (!(pid[count] = fork())) {
+          // child (pipe 받을 명령어 수행)
+          close(fd[count][READ]);
+          //strcpy(buf, "/bin/ls -al\n");
+          //parseline(buf, argv);
+          dup2(fd[count][WRITE], STDOUT_FILENO); // stdout이 fd[WRITE]이 되도록
+          
+          printf("This is execve result from child1\n");
+          //printf("%s, %s", argv[0], argv[1]);
+          exit(0);
         }
         else {
-          //parent
+          // parent (메세지를 보낼 프로세스)
+          close(fd[count][WRITE]);
+          //read(fd[count][READ],buf,MAX_BUF);
+          //printf("parent got message from child1 : %s\n",buf);
+
+          count++;
+          //dup2(fd[count][READ], STDOUT_FILENO);
+          //read(fd[count-1][READ],buf,MAX_BUF);
+          //printf("parent got message from child1 : %s\n",buf);
+
+          if(pipe(fd[count]) < 0){
+              printf("pipe error\n");
+              exit(1);
+          }
+
+          if (!(pid[count] = fork())) {
+            // child (pipe 받을 명령어 수행)
+            //close(fd[count][READ]);
+            //strcpy(buf, "/bin/ls -al\n");
+            //parseline(buf, argv);
+            read(fd[count-1][READ],buf,MAX_BUF);
+            dup2(fd[count][WRITE], STDOUT_FILENO); // stdout이 fd[WRITE]이 되도록
+            printf("%s\n",buf);
+            
+            printf("This is execve result from child2\n");
+            //printf("%s, %s", argv[0], argv[1]);
+            exit(0);
+          }
+          else{
+            //parent
+            read(fd[count][READ], buf, MAX_BUF);
+            printf("Final : %s", buf);
+          }
         }
-        /*
-        if(pid[0]>0){ //parent process
-                close(fd[READ]);
-                dup2(fd[WRITE], STDOUT_FILENO);
-                printf("This is execve result\n");
-                printf("fd[WRITE]: %d\n", fd[WRITE]);
-        }else{  //child process
-                close(fd[WRITE]);
-                read(fd[READ],buf,MAX_BUF);
-                printf("child got message : %s\n",buf);
-                printf("fd[READ]: %d\n", fd[READ]);
-        }
-        */
         exit(0);
 }

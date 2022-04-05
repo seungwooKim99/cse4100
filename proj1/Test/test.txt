@@ -1,0 +1,6 @@
+name phone gender
+kim 010-5955-5425 m
+lee 010-5955-1234 m
+son 010-5955-3232 f
+hwang 010-5955-1412 f
+choi 010-5955-6285 f

@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #define	MAXLINE 8192
+#define MAXPIPE 1024
 #define READ 0
 #define WRITE 1
 

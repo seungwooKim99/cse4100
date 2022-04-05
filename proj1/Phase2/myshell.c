@@ -2,50 +2,76 @@
 #define MAXARGS 128
 
 /*Function Prototypes*/
-void eval(char *cmdline);
+void eval(char *cmdline, int fd[][2], int count, pid_t *pid);
 int builtin_command(char **argv);
-int parseline(char *buf, char **argv);
+int parseline(char *buf, char **argv, char **buf_ptr);
 void unix_error(char *msg);
 int change_directory(char **argv);
 
 int main(){
   char cmdline[MAXLINE];
+  int fd[MAXPIPE][2];
+  pid_t pid[MAXPIPE];
   do{
     printf("CSE4110:P4-myshell> ");
     fgets(cmdline, MAXLINE, stdin);
     if (feof(stdin))
       exit(0);
     
-    eval(cmdline);
+    eval(cmdline, fd, 0, pid);
   } while(1);
 }
 
-void eval(char *cmdline){
+void eval(char *cmdline, int fd[][2], int count, pid_t *pid){
   char *argv[MAXARGS];
   char buf[MAXLINE];
+  char new_buf[MAXLINE];
   int bg;
-  pid_t pid;
+  char *buf_ptr;
+  char *pipe_exists;
+  int child_status;
 
   strcpy(buf, cmdline);
-  bg = parseline(buf, argv);
+  pipe_exists = strchr(buf, '|'); // 파이프가 존재하나?
+
+  // 파이프가 존재하면 pipe 생성
+  if (pipe_exists){
+    if (pipe(fd[count]) < 0){
+      printf("pipe error!\n");
+      exit(1);
+    }
+  }
+
+  // 가장 먼저 등장하는 커맨드 파싱
+  bg = parseline(buf, argv, &buf_ptr);
+  strncpy(new_buf, buf_ptr, MAXLINE);
+
   if (argv[0] == NULL)
     return;
   if (!builtin_command(argv)){
     // execute
-    if ((pid = fork()) == 0){
+    if ((pid[count] = fork()) == 0){ // Child process
+      if (count > 0)
+        dup2(fd[count-1][READ], STDIN_FILENO);
+      if (pipe_exists)
+        dup2(fd[count][WRITE], STDOUT_FILENO);
       if (execve(argv[0], argv, environ) < 0){
         printf("%s: Command not found.\n", argv[0]);
         exit(0);
       }
     }
-    if (!bg){
-      int status;
-      if (waitpid(pid, &status, 0) <0){
-        unix_error("waitfg: waitpid error");
+    else {   // Parent process
+      if (!bg){
+        if (waitpid(pid[count], &child_status, 0) < 0)
+          unix_error("waitfg: waitpid error");
+        if (pipe_exists) {
+          close(fd[count][WRITE]);
+          eval(new_buf, fd, ++count, pid);
+        }
       }
-    }
-    else{
-      printf("%d %s\n", pid, cmdline);
+      else {
+        printf("%d %s\n", pid[count], cmdline);
+      }
     }
   }
   return;
@@ -83,12 +109,18 @@ int builtin_command(char **argv)
   return 0;                     /* Not a builtin command */
 }
 
-int parseline(char *buf, char **argv){
-  char *delimiter_ptr;
+int parseline(char *buf, char **argv, char **buf_ptr){
+  char *delimiter_ptr;    /* Points to first space delimiter */
+  char *pipe_ptr;         /* Points to first pipe or NULL */
   int arg_num;
   int is_bg;
 
-  buf[strlen(buf)-1] = ' '; // '\n' to ' '
+  /* Pipe가 있는지 확인 */
+  pipe_ptr = strchr(buf, '|');
+  if (pipe_ptr)
+    *pipe_ptr = ' ';  // Pipe를 ' ' 으로 바꿈
+  else
+    buf[strlen(buf)-1] = ' '; // '\n'을 ' ' 으로 바꿈
   while (*buf && (*buf == ' ')) // Ignore leading spaces
     buf++;
   
@@ -100,7 +132,10 @@ int parseline(char *buf, char **argv){
     buf = delimiter_ptr + 1;
     while (*buf && (*buf == ' '))
       buf++;
+    if (pipe_ptr && ((pipe_ptr <= delimiter_ptr) || (pipe_ptr <= buf)))
+      break;
   }
+  *buf_ptr = buf;
   argv[arg_num] = NULL;
   
   if (arg_num == 0) // no args (blank line)

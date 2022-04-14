@@ -1,6 +1,6 @@
 CC = gcc
 
-PROGS = 20181610
+PROGS = myshell
 
 all: $(PROGS)
 
